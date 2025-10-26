@@ -525,7 +525,7 @@ const sendMessage = useCallback(
               ))}
             </div>
             
-<div className="absolute bottom-1 md:right-32 w-full right-1">
+<div className="absolute bottom-1 w-[65vw]">
   <SearchBar
               disabled={isStreaming}
               onSend={(t) => void sendMessage(t)}

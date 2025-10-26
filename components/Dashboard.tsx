@@ -127,7 +127,7 @@ export default function PremiumDashboard() {
       {/* Header */}
       <div>
         <h1 className="text-5xl py-3 font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-[#2000c1] to-[#2e147e]">
-          Welcome back, {session?.user?.user_metadata.first_name || session?.user?.user_metadata?.name || session?.user?.user_metadata?.user_name}!
+          Welcome back, {session?.user?.user_metadata.first_name || session?.user?.user_metadata?.name}!
         </h1>
         <p className="text-lg font-semibold text-[#6B7280] mt-4">
           Command, Create, Conquer — From Your AI Cockpit.

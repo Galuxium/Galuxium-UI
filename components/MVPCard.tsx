@@ -5,14 +5,8 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import dayjs from "dayjs";
 import relativeTime from "dayjs/plugin/relativeTime";
-import {
-  FaGithub,
-  FaStar,
-  FaTrash,
-  FaDownload,
-  FaEdit,
-} from "react-icons/fa";
-import { SiNetlify, SiVercel } from "react-icons/si";
+import { FaGithub, FaStar, FaTrash, FaDownload, FaEdit } from "react-icons/fa";
+import { SiVercel } from "react-icons/si";
 
 dayjs.extend(relativeTime);
 
@@ -28,10 +22,9 @@ export interface MVP {
   created_at: string;
   files: FileContent[];
   vercel_deployed?: boolean;
-  netlify_deployed?: boolean;
-  netlify_url?: string;
-  github_pushed?: boolean;
+  githubPushed?: boolean;
   ai_model?: string;
+  vercel_url?: string;
 }
 
 interface MVPCardProps {
@@ -39,53 +32,55 @@ interface MVPCardProps {
   onDelete?: (id: string) => void;
   onPushGithub?: (id: string) => void;
   onDeployVercel?: (id: string) => void;
-  onDeployNetlify?: (id: string) => void;
+  githubloading?: boolean;
+  githubloadingId?:string|null;
+  vercelloadingId?:string|null;
 }
 
 export const MVPCard: React.FC<MVPCardProps> = ({
+githubloadingId,
+  vercelloadingId,
   mvp,
   onDelete,
   onPushGithub,
   onDeployVercel,
-  onDeployNetlify,
 }) => {
   const downloadUrl = `/api/mvp/download/${encodeURIComponent(mvp.name)}`;
-
+const isDeploying = vercelloadingId === mvp.id;
+const isPushing = githubloadingId === mvp.id;
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       className="bg-white rounded-2xl p-6 shadow-lg border border-gray-200 flex flex-col justify-between h-full"
     >
-      {/* Title */}
+      {/* Title & Date */}
       <div className="flex flex-row justify-between">
         <div>
           <h3 className="text-2xl font-bold">{mvp.name}</h3>
-
-      {/* Date */}
-      <div className="text-sm bg-gradient-to-r py-2 from-[#2000c1] to-[#2e147e] text-transparent bg-clip-text font-semibold">
-        {dayjs(mvp.created_at).format("MMM D, YYYY · h:mm A")} &nbsp;
-        <span>({dayjs(mvp.created_at).fromNow()})</span>
-      </div>
+          <div className="text-sm bg-gradient-to-r py-2 from-[#2000c1] to-[#2e147e] text-transparent bg-clip-text font-semibold">
+            {dayjs(mvp.created_at).format("MMM D, YYYY · h:mm A")} &nbsp;
+            <span>({dayjs(mvp.created_at).fromNow()})</span>
+          </div>
         </div>
-    <div className="flex flex-row gap-3">
-      <Link href={downloadUrl} className="flex-1" download>
-          <div className="w-fit hover:scale-95 duration-500 text-center p-3 font-bold text-md rounded-lg bg-gradient-to-r from-[#2000c1] to-[#2e147e] text-white hover:brightness-90 transition-all flex items-center justify-center gap-2">
-            <FaDownload />
-          </div>
-        </Link>
-        <Link href={`/customize/${mvp.id}`} className="flex-1">
-          <div className="w-full px-3 hover:scale-95 duration-500 text-center py-3 text-md rounded-lg font-bold hover:bg-gray-400 text-[#1A1A1A] bg-gray-300 transition-all flex items-center justify-center gap-2">
-            <FaEdit />
-          </div>
-        </Link>
-    </div>
+        <div className="flex flex-row gap-3">
+          <Link href={downloadUrl} download>
+            <div className="w-fit hover:scale-95 duration-500 text-center p-3 font-bold text-md rounded-lg bg-gradient-to-r from-[#2000c1] to-[#2e147e] text-white hover:brightness-90 transition-all flex items-center justify-center gap-2">
+              <FaDownload />
+            </div>
+          </Link>
+          <Link href={`/customize/${mvp.id}`}>
+            <div className="w-full px-3 hover:scale-95 duration-500 text-center py-3 text-md rounded-lg font-bold hover:bg-gray-400 text-[#1A1A1A] bg-gray-300 transition-all flex items-center justify-center gap-2">
+              <FaEdit />
+            </div>
+          </Link>
+        </div>
       </div>
 
       {/* Status Badges */}
       <div className="flex flex-wrap gap-3 py-3">
         <StatusBadge
-          active={!!mvp.github_pushed}
+          active={!!mvp.githubPushed}
           activeLabel="GitHub Pushed"
           inactiveLabel="Not Pushed"
           icon={<FaGithub />}
@@ -98,17 +93,9 @@ export const MVPCard: React.FC<MVPCardProps> = ({
           icon={<SiVercel />}
           color="bg-gray-800"
         />
-        <StatusBadge
-          active={!!mvp.netlify_deployed}
-          activeLabel="Deployed"
-          inactiveLabel="Not Deployed"
-          icon={<SiNetlify />}
-          color="bg-cyan-600"
-        />
         <div className="bg-indigo-700 text-white px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5">
           <FaStar /> {mvp.ai_model || "Mistral 8x7b"}
         </div>
-        
       </div>
 
       {/* Prompt */}
@@ -133,42 +120,52 @@ export const MVPCard: React.FC<MVPCardProps> = ({
 
       {/* Actions */}
       <div className="flex flex-row gap-2 mt-3">
-        
-        {/* Deployment Actions */}
-        {!mvp.github_pushed && (
-          <button
-            onClick={() => onPushGithub?.(mvp.id)}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-black text-white rounded-xl font-semibold hover:scale-95 transition duration-500"
+        {mvp.githubPushed ? (
+  <p className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl font-semibold hover:scale-95 transition duration-500"
+       ><FaGithub /> Pushed</p>
+) : (
+  <button
+    onClick={() => onPushGithub?.(mvp.id)}
+    disabled={isPushing}
+    className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-semibold hover:scale-95 transition duration-500 ${
+      
+       isPushing ? "bg-gray-600 text-white" : "bg-gray-800 text-white"
+    }`}
+  >
+    <FaGithub /> {isPushing ? "Pushing..." : "Push"}
+  </button>
+)}
+
+
+           {/* Vercel deploy button */}
+        {mvp.vercel_deployed ? (
+          <a
+            href={mvp.vercel_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-xl font-semibold hover:scale-95 transition duration-500"
           >
-            <FaGithub /> Push
-          </button>
-        )}
-        {!mvp.vercel_deployed || (
+            <SiVercel /> Deployed
+          </a>
+        ) : (
           <button
             onClick={() => onDeployVercel?.(mvp.id)}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-gray-800 text-white rounded-xl font-semibold hover:scale-95 transition duration-500"
+            disabled={isDeploying}
+            className={`flex items-center justify-center gap-2 px-4 py-2 rounded-xl font-semibold hover:scale-95 transition duration-500 ${
+              isDeploying ? "bg-gray-600 text-white" : "bg-gray-800 text-white"
+            }`}
           >
-            <SiVercel /> Vercel
+            <SiVercel /> {isDeploying ? "Deploying..." : "Deploy"}
           </button>
         )}
-        {!mvp.netlify_deployed && (
-          <button
-            onClick={() => onDeployNetlify?.(mvp.id)}
-            className="flex items-center justify-center gap-2 px-4 py-2 bg-cyan-600 text-white rounded-xl font-semibold hover:scale-95 transition duration-500"
-          >
-            <SiNetlify /> Netlify
-          </button>
-        )}
+
         <button
           onClick={() => onDelete?.(mvp.id)}
           className="bg-red-700 text-white px-5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 hover:scale-95 transition duration-500"
         >
           <FaTrash />
         </button>
-        
       </div>
-
-      
     </motion.div>
   );
 };

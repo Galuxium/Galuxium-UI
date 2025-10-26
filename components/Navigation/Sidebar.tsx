@@ -4,7 +4,7 @@ import { supabase } from "@/lib/supabase";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { FaTimes, FaBars, FaTachometerAlt, FaCogs, FaGamepad } from "react-icons/fa";
+import { FaTimes, FaBars } from "react-icons/fa";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   FaBolt,
@@ -44,12 +44,8 @@ export default function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
   const toggleCollapsed = () => setCollapsed(!collapsed);
 
   const menuItems = [
-    { label: "Dashboard", icon: <FaTachometerAlt />, path: "/" },
-    { label: "MVPs", icon: <FaCogs />, path: "/mvps" },
-    { label: "Galuxium AI", icon: <FaBolt />, path: "/galuxiumai" },
-    { label: "Settings", icon: <FaGamepad />, path: "/settings" },
+    { label: "Assistant", icon: <FaBolt />, path: "/" },
   ];
-
 
   const handleSelect = (path: string) => {
     if (pathname !== path) router.push(path);

@@ -28,9 +28,8 @@ interface MVP {
   created_at: string;
   files: FileContent[];
   vercel_deployed: boolean;
-  github_pushed: boolean;
-  netlify_deployed?: boolean;
-  netlify_url?: string;
+  githubPushed: boolean;
+  vercel_url?: string;
 }
 
 interface SupabaseMVP {
@@ -40,20 +39,11 @@ interface SupabaseMVP {
   created_at: string;
   files: string | FileContent[];
   vercel_deployed: boolean;
-  github_pushed: boolean;
-  netlify_deployed?: boolean;
-  netlify_url?: string;
+  githubPushed: boolean;
+  vercel_url?: string;
 }
 
-interface GithubTokenResponse {
-  connected: boolean;
-}
-interface NetlifyTokenResponse {
-  connected: boolean;
-}
-interface NetlifyDeployResponse {
-  netlify_url: string;
-}
+
 
 const featureOptions = [
   "Landing Page",
@@ -81,20 +71,16 @@ export default function ManageMVPsPage() {
   const [done, setDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [downloadUrl, setDownloadUrl] = useState<string | null>(null);
-   const [isGithubConnected, setIsGithubConnected] = useState(false);
-  const [isNetlifyConnected, setIsNetlifyConnected] = useState(false);
-  const router = useRouter();
-  const {session} = useSession();
 
+  const router = useRouter();
+  const { session } = useSession();
+
+  // 🔹 Fetch MVPs
   useEffect(() => {
-    if (!session) {
-      router.push("/");
-      return;
-    }
+    if (!session) return router.push("/");
 
     const fetchMVPs = async () => {
       setLoading(true);
-
       const { data, error } = await supabase
         .from("mvps")
         .select("*")
@@ -112,8 +98,9 @@ export default function ManageMVPsPage() {
         name: m.name,
         prompt: m.prompt,
         created_at: m.created_at,
-        github_pushed: m.github_pushed,
+        githubPushed: m.githubPushed,
         vercel_deployed: m.vercel_deployed,
+        vercel_url: m.vercel_url,
         files: typeof m.files === "string" ? JSON.parse(m.files) : m.files || [],
       }));
 
@@ -124,33 +111,23 @@ export default function ManageMVPsPage() {
     fetchMVPs();
   }, [session, router]);
 
+  // 🔹 MVP Generation Streaming
   useEffect(() => {
     if (modalStep !== "stream") return;
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       const userId = session?.user?.id;
       const accessToken = session?.access_token;
-      if (!userId || !accessToken) {
-        setError("Not authenticated.");
-        return;
-      }
+      if (!userId || !accessToken) return setError("Not authenticated.");
 
       const { idea, industry, audience, projectName, features } = createForm;
-      const prompt = idea;
       const nameSafe =
         projectName ||
-        idea
-          .split(/\s+/)
-          .slice(0, 3)
-          .join("-")
-          .toLowerCase()
-          .replace(/[^\w\-]/g, "");
-
+        idea.split(/\s+/).slice(0, 3).join("-").toLowerCase().replace(/[^\w\-]/g, "");
       const formData = { idea, industry, audience, projectName, features };
-
       const queryParams = new URLSearchParams({
         userId,
-        prompt,
+        prompt: idea,
         projectName: nameSafe,
         formData: JSON.stringify(formData),
       });
@@ -158,16 +135,10 @@ export default function ManageMVPsPage() {
       try {
         const res = await fetch(
           `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/mvp/generate-stream?${queryParams.toString()}`,
-          {
-            method: "GET",
-            headers: {
-              Authorization: `Bearer ${accessToken}`,
-            },
-          }
+          { method: "GET", headers: { Authorization: `Bearer ${accessToken}` } }
         );
 
         if (!res.ok || !res.body) throw new Error("No stream returned from server.");
-
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
 
@@ -180,19 +151,12 @@ export default function ManageMVPsPage() {
             if (!line.trim() || !line.startsWith("data:")) continue;
             try {
               const json = JSON.parse(line.replace("data: ", ""));
-              if (json.filename) {
-                setFiles((prev) => [...prev, json.filename]);
-              }
-              if (json.projectName) {
+              if (json.filename) setFiles((prev) => [...prev, json.filename]);
+              if (json.projectName)
                 setDownloadUrl(
-                  `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/mvp/download/${encodeURIComponent(
-                    json.projectName
-                  )}`
+                  `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/mvp/download/${encodeURIComponent(json.projectName)}`
                 );
-              }
-              if (json.done) {
-                setDone(true);
-              }
+              if (json.done) setDone(true);
             } catch (err) {
               console.error("Invalid stream JSON:", err);
             }
@@ -204,41 +168,18 @@ export default function ManageMVPsPage() {
       }
     });
   }, [modalStep, createForm]);
-  useEffect(() => {
-    checkGithubConnection();
-    checkNetlifyConnection();
-  }, []);
 
-  const checkGithubConnection = async () => {
-    try {
-      const res = await axios.get<GithubTokenResponse>(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/github/token`,
-        { withCredentials: true }
-      );
-      setIsGithubConnected(res.data.connected);
-    } catch {
-      setIsGithubConnected(false);
-    }
-  };
 
-  const checkNetlifyConnection = async () => {
-    try {
-      const res = await axios.get<NetlifyTokenResponse>(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/netlify/token`,
-        { withCredentials: true }
-      );
-      setIsNetlifyConnected(res.data.connected);
-    } catch {
-      setIsNetlifyConnected(false);
-    }
-  };
 
-  const connectGithub = () => {
-    window.location.href = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/github/login`;
-  };
-  const connectNetlify = () => {
-    window.location.href = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/netlify/login`;
-  };
+
+  // 🔹 Toggle Features
+  const toggleFeature = (f: string) =>
+    setCreateForm((cf) => ({
+      ...cf,
+      features: cf.features.includes(f)
+        ? cf.features.filter((x) => x !== f)
+        : [...cf.features, f],
+    }));
 
   // 🔹 Delete MVP
   const handleDelete = async (id: string) => {
@@ -248,131 +189,54 @@ export default function ManageMVPsPage() {
     setMvps((prev) => prev.filter((m) => m.id !== id));
   };
 
-  // 🔹 Push to GitHub
-  const handlePushGithub = async (mvp: MVP) => {
-    if (!isGithubConnected) {
-      toast.error("Please connect GitHub first.");
-      return connectGithub();
-    }
+const [githubloadingId, setGithubloadingId] = useState<string | null>(null);
+// Handle GitHub push
+const handlePushGithub = async (mvp:MVP) => {
 
-    const repoName = prompt("Enter repository name:");
-    const description = prompt("Enter repository description:") || "";
-    if (!repoName) return toast.error("Repository name required.");
 
-    try {
-      toast.loading("Pushing to GitHub...");
-      await axios.post(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/github/push`,
-        {
-          repoName,
-          description,
-          files: mvp.files,
-          mvpId: mvp.id,
-        },
-        { withCredentials: true }
-      );
-      toast.dismiss();
-      toast.success("Pushed to GitHub!");
-
-      // update state
-      setMvps((prev) =>
-        prev.map((item) =>
-          item.id === mvp.id ? { ...item, github_pushed: true } : item
-        )
-      );
-    } catch (err) {
-      toast.dismiss();
-      console.error(err);
-      toast.error("GitHub push failed.");
-    }
-  };
-
-  // 🔹 Deploy to Netlify
-  const handleDeployNetlify = async (mvp: MVP) => {
-    if (!isNetlifyConnected) {
-      toast.error("Please connect Netlify first.");
-      return connectNetlify();
-    }
-
-    try {
-      toast.loading("Deploying to Netlify...");
-      const res = await axios.post<NetlifyDeployResponse>(
-        `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/netlify/deploy`,
-        {
-          files: mvp.files,
-          mvpId: mvp.id,
-        },
-        { withCredentials: true }
-      );
-      toast.dismiss();
-      toast.success("Deployed to Netlify!");
-
-      const newUrl = res.data.netlify_url;
-
-      await supabase
-        .from("mvps")
-        .update({ netlify_deployed: true, netlify_url: newUrl })
-        .eq("id", mvp.id);
-
-      setMvps((prev) =>
-        prev.map((item) =>
-          item.id === mvp.id
-            ? { ...item, netlify_deployed: true, netlify_url: newUrl }
-            : item
-        )
-      );
-    } catch (err) {
-      toast.dismiss();
-      console.error(err);
-      toast.error("Netlify deploy failed.");
-    }
-  };
-  
-  const toggleFeature = (f: string) =>
-    setCreateForm((cf) => ({
-      ...cf,
-      features: cf.features.includes(f)
-        ? cf.features.filter((x) => x !== f)
-        : [...cf.features, f],
-    }));
-
-const handleDeployVercel = async (mvp: MVP) => {
   try {
-    toast.loading("Deploying to Vercel...");
-    // const res = await axios.post(
-    //   "http://localhost:5000/api/vercel/deploy",
-    //   {
-    //     files: mvp.files,
-    //     mvpId: mvp.id,
-    //   },
-    //   { withCredentials: true }
-    // );
+    setGithubloadingId(mvp.id);
+    const repoName = prompt("Enter repository name");
+    if (!repoName) return;
 
-    toast.dismiss();
-    toast.success("Deployed to Vercel!");
+    await axios.put(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/github/push`, {
+      repoName,
+      files: mvp.files,
+      mvpId:mvp.id
+    });
 
-    await supabase
-      .from("mvps")
-      .update({ vercel_deployed: true })
-      .eq("id", mvp.id);
-
-    setMvps((prev) =>
-      prev.map((item) =>
-        item.id === mvp.id ? { ...item, vercel_deployed: true } : item
-      )
-    );
+    alert("Pushed to GitHub!");
+    setGithubloadingId(null);
   } catch (err) {
-    toast.dismiss();
     console.error(err);
-    toast.error("Vercel deploy failed.");
+    alert("Push failed");
   }
 };
 
+
+const [vercelloadingId, setVercelLoadingId] = useState<string | null>(null);
+
+const handleDeployVercel = async (mvp: MVP) => {
+  try {
+    setVercelLoadingId(mvp.id);
+    const res = await axios.put(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/vercel/deploy`, { files: mvp.files, mvpId: mvp.id,name:mvp.name });
+    setMvps(prev => prev.map(item =>
+      item.id === mvp.id ? { ...item, vercel_deployed: true, vercel_url: res.data.vercel_url } : item
+    ));
+  } catch (err) {
+    console.error(err);
+    alert("Deploy failed");
+  } finally {
+    setVercelLoadingId(null);
+  }
+};
+
+
+
+  // 🔹 Create MVP
   const handleCreate = async () => {
     const { idea, industry, audience } = createForm;
-    if (!idea || !industry || !audience) {
-      return toast.error("Please fill out all fields.");
-    }
+    if (!idea || !industry || !audience) return toast.error("Please fill all fields.");
 
     const { data: { session } } = await supabase.auth.getSession();
     if (!session?.user) return toast.error("Authentication required.");
@@ -384,7 +248,6 @@ const handleDeployVercel = async (mvp: MVP) => {
     setModalStep("stream");
   };
 
-
   if (loading) return <Loading />;
 
   return (
@@ -394,9 +257,7 @@ const handleDeployVercel = async (mvp: MVP) => {
           <h1 className="text-4xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-[#2000c1] to-[#2e147e]">
             Your SaaS MVPs
           </h1>
-          <p className="text-lg text-gray-500 mt-2">
-            Build, download, and scale your MVPs instantly.
-          </p>
+          <p className="text-lg text-gray-500 mt-2">Build, download, and scale your MVPs instantly.</p>
         </div>
         <button
           onClick={() => setModalStep("create")}
@@ -408,9 +269,7 @@ const handleDeployVercel = async (mvp: MVP) => {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
         {mvps.length === 0 ? (
-          <div className="col-span-full text-center text-gray-500">
-            No MVPs yet.
-          </div>
+          <div className="col-span-full text-center text-gray-500">No MVPs yet.</div>
         ) : (
           mvps.map((mvp) => (
             <MVPCard
@@ -418,8 +277,9 @@ const handleDeployVercel = async (mvp: MVP) => {
               mvp={mvp}
               onDelete={() => handleDelete(mvp.id)}
               onPushGithub={() => handlePushGithub(mvp)}
+              vercelloadingId={vercelloadingId}
+              githubloadingId={githubloadingId}
               onDeployVercel={() => handleDeployVercel(mvp)}
-              onDeployNetlify={() => handleDeployNetlify(mvp)}
             />
           ))
         )}
@@ -494,10 +354,7 @@ const handleDeployVercel = async (mvp: MVP) => {
                       ))}
                     </div>
                     <div className="text-right justify-between flex flex-row">
-                      <button
-                        
-                        className="px-5 py-2 mt-3 bg-gradient-to-r from-[#ce7100] to-[#e07b00] text-white rounded-lg"
-                      >
+                      <button className="px-5 py-2 mt-3 bg-gradient-to-r from-[#ce7100] to-[#e07b00] text-white rounded-lg">
                         Draft
                       </button>
                       <button
@@ -525,7 +382,7 @@ const handleDeployVercel = async (mvp: MVP) => {
                         style={{ width: done ? "100%" : `${files.length * 6}%` }}
                       />
                     </div>
-                    <ul className="text-sm text-gray-600 space-y-1  overflow-auto mb-3">
+                    <ul className="text-sm text-gray-600 space-y-1 overflow-auto mb-3">
                       {files.map((f, i) => (
                         <li key={i} className="flex justify-between">
                           <span className="font-semibold text-md">{f}</span>
@@ -554,4 +411,3 @@ const handleDeployVercel = async (mvp: MVP) => {
     </div>
   );
 }
-

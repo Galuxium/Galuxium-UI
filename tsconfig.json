@@ -12,6 +12,7 @@
     "resolveJsonModule": true,
     "isolatedModules": true,
     "jsx": "preserve",
+    
     "incremental": true,
     "plugins": [
       {
@@ -22,6 +23,6 @@
       "@/*": ["./*"]
     }
   },
-  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "lib/supabase.ts", "tailwind.config.js", "components/LandingPage.jsx"],
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts", "lib/supabase.ts", "tailwind.config.js", "components/LandingPage.jsx", "app/analytics/page.tsx"],
   "exclude": ["node_modules"]
 }
