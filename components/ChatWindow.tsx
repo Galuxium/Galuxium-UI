@@ -23,7 +23,7 @@ const userId=session?.user?.id;
       id: uuidv4(),
       role: "user",
       content: trimmed,
-      createdAt: new Date().toISOString(),
+      created_at: new Date().toISOString(),
     };
 
     const nextMessages = [...messages, userMsg];
@@ -53,7 +53,7 @@ const userId=session?.user?.id;
         id: uuidv4(),
         role: "assistant",
         content: assistantContent,
-        createdAt: new Date().toISOString(),
+        created_at: new Date().toISOString(),
       };
       const conversationId = uuidv4();
 
@@ -89,7 +89,7 @@ await axios.post(`${BACKEND_BASE}/api/conversations/save`, {
           id: uuidv4(),
           role: "assistant",
           content: "Error: failed to get response from server",
-          createdAt: new Date().toISOString(),
+          created_at: new Date().toISOString(),
         },
       ]);
     } finally {
