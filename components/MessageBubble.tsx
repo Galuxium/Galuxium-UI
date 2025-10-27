@@ -1,6 +1,6 @@
 import React from "react";
 import ReactMarkdown from "react-markdown";
-import type { ChatMessage } from "../../lib/types";
+import type { ChatMessage } from "@/lib/types";
 import { Inter } from "next/font/google";
 
 const modelColors: Record<string, string> = {

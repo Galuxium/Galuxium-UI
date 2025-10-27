@@ -1,10 +1,10 @@
-import Navbar from "@/components/BrandShowcase/Navbar";
-import Hero from "@/components/BrandShowcase/Hero";
-import Features from "@/components/BrandShowcase/Features";
-import Pricing from "@/components/BrandShowcase/Pricing";
-import CTA from "@/components/BrandShowcase/Cta";
-import Footer from "@/components/BrandShowcase/Footer";
-import AboutGaluxium from "@/components/BrandShowcase/About";
+import Navbar from "@/components/Navbar";
+import Hero from "@/components/Hero";
+import Features from "@/components/Features";
+import Pricing from "@/components/Pricing";
+import CTA from "@/components/Cta";
+import Footer from "@/components/Footer";
+import AboutGaluxium from "@/components/About";
 
 export default function Home() {
   return (
