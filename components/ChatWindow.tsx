@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import type { ChatMessage } from "../../lib/types";
+import type { ChatMessage } from "@/lib/types";
 import MessageBubble from "./MessageBubble";
 import axios from "axios";
 import { v4 as uuidv4 } from "uuid";
@@ -23,7 +23,7 @@ const userId=session?.user?.id;
       id: uuidv4(),
       role: "user",
       content: trimmed,
-      created_at: new Date().toISOString(),
+      createdAt: new Date().toISOString(),
     };
 
     const nextMessages = [...messages, userMsg];
@@ -53,7 +53,7 @@ const userId=session?.user?.id;
         id: uuidv4(),
         role: "assistant",
         content: assistantContent,
-        created_at: new Date().toISOString(),
+        createdAt: new Date().toISOString(),
       };
       const conversationId = uuidv4();
 
@@ -85,7 +85,6 @@ await axios.post(`${BACKEND_BASE}/api/conversations/save`, {
       console.error("chat send err", err);
       setMessages((prev) => [
         ...prev,
-        
         {
           id: uuidv4(),
           role: "assistant",

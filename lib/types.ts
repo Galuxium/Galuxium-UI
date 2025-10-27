@@ -25,7 +25,7 @@ export type MVP = {
 // extend your ChatMessage type
 export type ChatMessage = {
   id: string;
-  conversation_id: string;
+  conversation_id?: string;
   user_id?: string | null;
   role: "user" | "assistant" | string;
   content: string;
@@ -100,7 +100,7 @@ export interface Message {
   role: Role;
   content: string;
   model_used?: string | null;
-  created_at: string;
+  created_at?: string;
   hasMVP?:boolean;
 }
 
