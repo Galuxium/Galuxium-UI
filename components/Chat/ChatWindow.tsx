@@ -90,7 +90,7 @@ await axios.post(`${BACKEND_BASE}/api/conversations/save`, {
           id: uuidv4(),
           role: "assistant",
           content: "Error: failed to get response from server",
-          createdAt: new Date().toISOString(),
+          created_at: new Date().toISOString(),
         },
       ]);
     } finally {
