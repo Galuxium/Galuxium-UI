@@ -3,7 +3,7 @@ import "./globals.css";
 import type { Metadata } from "next";
 import { SessionProvider } from "@/lib/SessionContext";
 import ClientWrapper from "@/components/ClientWrapper";
-
+import GlobalSettingsProvider from "@/contexts/GlobalSettingsContext";
 
 export const metadata: Metadata = {
   title: "Galuxium",
@@ -15,14 +15,16 @@ export default async function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-
-
-
   return (
     <html lang="en">
       <body className="antialiased ">
         <SessionProvider>
-          <ClientWrapper>{children}</ClientWrapper>
+          <GlobalSettingsProvider>
+         
+      
+              <ClientWrapper>{children}</ClientWrapper>
+           
+          </GlobalSettingsProvider>
         </SessionProvider>
       </body>
     </html>

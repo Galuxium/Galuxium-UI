@@ -295,12 +295,15 @@ const sendMessage = useCallback(
       .map((m) => ({ role: m.role as Role, content: m.content }));
     history.push({ role: "user", content: text });
 
+    
+
     try {
       // Step 5: Call AI backend
       const resp = await fetch(`${BACKEND_URL}/api/chat/search`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          userId,
           model,
           userMessages: history,
           modelProfile: {
@@ -527,7 +530,7 @@ const sendMessage = useCallback(
             
 <div className="absolute bottom-1 w-[65vw]">
   <SearchBar
-              disabled={isStreaming}
+              disabled={isStreaming || !session?.user?.id}
               onSend={(t) => void sendMessage(t)}
               scrollToBottom={scrollToBottom}
               autoScroll={autoScroll}

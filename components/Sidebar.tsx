@@ -13,6 +13,8 @@ import {
 } from "react-icons/fa";
 import { useSession } from "@/lib/SessionContext";
 import { Session } from "@supabase/supabase-js";
+import { SettingsIcon } from "lucide-react";
+import GlobalSettings from "./GlobalSettings";
 interface SidebarProps {
   collapsed: boolean;
   setCollapsed: (value: boolean) => void;
@@ -26,7 +28,7 @@ export default function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
   const [modalOpen, setModalOpen] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState("/default-avatar.jpg");
   const [mobileOpen, setMobileOpen] = useState(false);
-
+const [showGlobalSettings, setShowGlobalSettings] = useState(false);
   // Fetch user avatar
   useEffect(() => {
     const fetchAvatar = async () => {
@@ -115,7 +117,9 @@ export default function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
           ))}
         </nav>
       </div>
-
+          <div className="ml-3.5">
+                      <button onClick={() => { setShowGlobalSettings(true); }} className="px-3 py-2  dark:bg-black border rounded"><SettingsIcon/></button>
+          </div>
       {/* Bottom Section */}
       <SidebarBottom
         collapsed={collapsed}
@@ -125,7 +129,9 @@ export default function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
         handleSignOut={handleSignOut}
         setModalOpen={setModalOpen}
       />
+      
     </div>
+    
   );
 
   /** Mobile Sidebar Drawer */
@@ -202,6 +208,12 @@ export default function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
       {DesktopSidebar}
       {MobileSidebar}
       <AnimatePresence>{modalOpen && <ProfileModal onClose={() => setModalOpen(false)} />}</AnimatePresence>
+      <GlobalSettings
+        isOpen={showGlobalSettings}
+        onClose={() => setShowGlobalSettings(false)}
+        initialTab="services"
+        
+      />
     </>
   );
 }
