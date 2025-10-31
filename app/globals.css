@@ -2,6 +2,30 @@
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
+/* Pulsing background */
+@keyframes pulse-slow {
+  0%,100% { opacity: 1; }
+  50% { opacity: 0.75; }
+}
+.animate-pulse-slow {
+  animation: pulse-slow 4s ease-in-out infinite;
+}
+
+/* Neon cursor + glow when Founders Mode active */
+body.founders-mode {
+  cursor: url("/cursors/cursor-rocket.png"), auto;
+  transition: background 1s ease-in-out;
+  background: radial-gradient(circle at center,
+    rgba(99,0,255,0.2),
+    rgba(255,0,180,0.1) 70%,
+    transparent 100%);
+  box-shadow: 0 0 60px 10px rgba(255,0,180,0.2) inset;
+}
+
+/* Optional text glow */
+.founders-glow {
+  text-shadow: 0 0 6px #ff80ff, 0 0 12px #ffaaff;
+}
 
 @theme inline {
 

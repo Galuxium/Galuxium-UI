@@ -34,6 +34,80 @@ export type ChatMessage = {
   mvp?: MVP | null; // attach MVP if present
 };
 
+// File: frontend/types/galuxium.d.ts
+
+export type AgentPhase =
+  | "BizMind"      // Market intelligence, opportunity analysis
+  | "BrandPulse"   // Branding & storytelling
+  | "CodeWeaver"   // Technical build & validation
+  | "LaunchLens"  // Go-to-market & deployment
+  |"setup"
+  |"classification";
+
+export interface IdeaClassification {
+  category: string;
+  tags: string[];
+  confidence: number;
+  summary: string;
+}
+
+export interface AgentOutput {
+  phase: AgentPhase;
+  status: "idle" | "running" | "completed" | "error";
+  progress: number;
+  message: string;
+  logs: string[];
+  file_url?: string;
+
+  // Specific structured outputs per agent
+  data:
+    | BizMindOutput
+    | BrandPulseOutput
+    | CodeWeaverOutput
+    | LaunchLensOutput
+    | null;
+}
+
+export interface BizMindOutput {
+  marketSize: string;
+  competitors: string[];
+  opportunities: string[];
+  problemStatement: string;
+  targetAudience: string;
+}
+
+export interface BrandPulseOutput {
+  nameSuggestions: string[];
+  taglines: string[];
+  toneOfVoice: string;
+  brandColors: string[];
+  logoPrompt: string;
+}
+
+export interface CodeWeaverOutput {
+  stack: string[];
+  repoUrl?: string;
+  deploymentUrl?: string;
+  architectureSummary: string;
+  techSpec: string;
+}
+
+export interface LaunchLensOutput {
+  launchPlan: string[];
+  marketingAssets: string[];
+  pricingStrategy: string;
+  channels: string[];
+}
+
+export interface AgentData {
+  phase: AgentPhase;
+  sub_phase?: string;
+  progress?: number;
+  message?: string;
+  messages?: string[];
+  file_url?: string;
+  output?: AgentOutput;
+}
 
 
 export interface ModelProfile {

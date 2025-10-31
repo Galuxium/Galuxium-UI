@@ -6,13 +6,32 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useSession } from "@/lib/SessionContext";
 import ConversationBubble from "@/components/AI/ConversationBubble";
 import SearchBar from "@/components/AI/SearchBar";
-import {FaEnvelopeOpenText, FaFacebookMessenger, FaHistory, FaPlus } from "react-icons/fa";
-import { Bot } from "lucide-react";
+import {
+  FaEnvelopeOpenText,
+  FaFacebookMessenger,
+  FaHistory,
+  FaPlus,
+} from "react-icons/fa";
+import { Bot, FileText, Palette, Presentation } from "lucide-react";
 import MessageBubble from "@/components/MessageBubble";
 import { useSmartAutoScroll } from "@/hooks/useSmartAutoScroll";
 import { supabase } from "@/lib/supabase";
+import { classifyIdea } from "@/lib/classifyIdea";
+import FoundersModeBanner from "@/components/FoundersModeBanner";
 
+import AgentCard from "@/components/AgentCard";
+import { AgentData } from "@/lib/types";
+import Link from "next/link";
+import Image from "next/image";
 export type Role = "user" | "assistant" | "system";
+interface ReportData {
+  pdf: string;
+  pptx: string;
+  logos: string[];
+  palette?: string;
+  idea_id: string;
+  created_at?: string;
+}
 
 export interface Conversation {
   id: string;
@@ -25,21 +44,20 @@ export interface Conversation {
 
 export interface Message {
   id: string;
-  conversation_id: string;
+  conversation_id?: string;
   user_id?: string | null;
   role: Role;
   content: string;
   model_used?: string | null;
-  created_at: string;
+  created_at?: string;
 }
 export interface ModelOption {
   name: string;
   id: string;
-  description:string;
+  description: string;
 }
 
-const BACKEND_URL: string =
-  (process.env.NEXT_PUBLIC_BACKEND_URL as string);
+const BACKEND_URL: string = process.env.NEXT_PUBLIC_BACKEND_URL as string;
 
 function estimateTokensFromText(text: string): number {
   if (!text) return 0;
@@ -51,67 +69,69 @@ export default function PremiumGaluxiumPage() {
   const [activeConversationId, setActiveConversationId] = useState<
     string | null
   >(null);
-const [userTokensUsed, setUserTokensUsed] = useState<number>(0);
-const [userPlan, setUserPlan] = useState<"free" | "premium">("free");
+  const [userTokensUsed, setUserTokensUsed] = useState<number>(0);
+  const [userPlan, setUserPlan] = useState<"free" | "premium">("free");
 
-
+  const [isFoundersMode, setIsFoundersMode] = useState(false);
+  const [ideaDetected, setIdeaDetected] = useState<string | null>(null);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const containerRef = useRef<HTMLDivElement>(null);
+const [report, setReport] = useState<ReportData | null>(null);
 
-    const [userTokens, setUserTokens] = useState<number>(0);
+  const [userTokens, setUserTokens] = useState<number>(0);
   const [assistantTokens, setAssistantTokens] = useState<number>(0);
   const [models, setModels] = useState<ModelOption[]>([]);
-const [model, setModel] = useState<string | null>(null);
+  const [model, setModel] = useState<string | null>(null);
   const [conversationsList, setConversationsList] = useState<boolean>(false);
   const { containerRefChat, bottomRef, autoScroll, scrollToBottom } =
     useSmartAutoScroll<HTMLDivElement>([messages]);
   const [toast, setToast] = useState<string | null>(null);
-  const {session} = useSession();
+  const { session } = useSession();
   const userId: string | null = session?.user?.id ?? null;
-  
+  useEffect(() => {
+    if (isFoundersMode) document.body.classList.add("founders-mode");
+    else document.body.classList.remove("founders-mode");
+  }, [isFoundersMode]);
+
   const messagesRef = useRef<Message[]>([]);
   messagesRef.current = messages;
-useEffect(() => {
-  if (!userId) return;
-  (async () => {
-    try {
-      const userDataResp = await supabase
-  .from("users")
-  .select("tokens_used, plan,userTokens,assistantTokens")
-  .eq("id", userId)
-  .single();
+  useEffect(() => {
+    if (!userId) return;
+    (async () => {
+      try {
+        const userDataResp = await supabase
+          .from("users")
+          .select("tokens_used, plan,userTokens,assistantTokens")
+          .eq("id", userId)
+          .single();
 
-if (userDataResp.error) throw userDataResp.error;
+        if (userDataResp.error) throw userDataResp.error;
 
-const userData = userDataResp.data; // ✅ contains tokens_used & plan
-console.log(userData.tokens_used, userData.plan);
+        const userData = userDataResp.data; // ✅ contains tokens_used & plan
+        console.log(userData.tokens_used, userData.plan);
 
-    
-      setUserTokensUsed(userData.tokens_used);
-      setUserPlan(userData.plan);
-      setUserTokens(userData.userTokens);
-      setAssistantTokens(userData.assistantTokens);
-    } catch (err) {
-      console.error("Failed to fetch user info", err);
-    }
-  })();
-}, [userId,session]);
+        setUserTokensUsed(userData.tokens_used);
+        setUserPlan(userData.plan);
+        setUserTokens(userData.userTokens);
+        setAssistantTokens(userData.assistantTokens);
+      } catch (err) {
+        console.error("Failed to fetch user info", err);
+      }
+    })();
+  }, [userId, session]);
 
-useEffect(() => {
-  const fetchModels = async () => {
-    const res = await fetch(`${BACKEND_URL}/api/chat/models`);
-    const { data } = await res.json();
-    
-    setModels(data);
-    if (data.length > 0) setModel(data[0].id);
-  };
-  fetchModels();
-}, []);
+  useEffect(() => {
+    const fetchModels = async () => {
+      const res = await fetch(`${BACKEND_URL}/api/chat/models`);
+      const { data } = await res.json();
 
-
-
+      setModels(data);
+      if (data.length > 0) setModel(data[0].id);
+    };
+    fetchModels();
+  }, []);
 
   // load conversations for user
   useEffect(() => {
@@ -216,103 +236,313 @@ useEffect(() => {
       console.warn("saveMessage failed", err);
     }
   }, []);
+ const [agentOutputs, setAgentOutputs] = useState<AgentData[]>([]);
+  const sendMessage = useCallback(
+    async (text: string) => {
+      if (!text.trim()) return;
+      if (!userId) {
+        showToast("You must be signed in");
+        return;
+      }
 
+      // Step 0: Estimate user tokens and check plan limit
+      const userTokens = estimateTokensFromText(text);
+      if (userPlan === "free" && userTokensUsed + userTokens > 5000) {
+        showToast(`Free plan limit reached (5,000 tokens). Upgrade for more.`);
+        return;
+      }
 
-const sendMessage = useCallback(
-  async (text: string) => {
-    if (!text.trim()) return;
-    if (!userId) {
-      showToast("You must be signed in");
-      return;
-    }
+      // Step 1: Create conversation if none exists
+      let cid = activeConversationId;
+      if (!cid) {
+        try {
+          const r = await fetch(`${BACKEND_URL}/api/chat/create`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              userId,
+              title: text.slice(0, 50) || "New chat",
+              model,
+            }),
+          });
+          if (!r.ok) throw new Error("Failed to create conversation");
+          const j = await r.json();
+          cid = j?.data?.id;
+          if (!cid) throw new Error("Conversation creation returned no ID");
+          setConversations((c) => [j.data as Conversation, ...c]);
+          setActiveConversationId(cid);
+        } catch (err) {
+          console.error(err);
+          showToast("Network error while creating conversation");
+          return;
+        }
+      }
 
-    // Step 0: Estimate user tokens and check plan limit
-    const userTokens = estimateTokensFromText(text);
-    if (userPlan === "free" && userTokensUsed + userTokens > 5000) {
-      showToast(`Free plan limit reached (5,000 tokens). Upgrade for more.`);
-      return;
-    }
+      // Step 2: Add user message locally & backend
+      const userMsg: Message = {
+        id: uuidv4(),
+        conversation_id: cid!,
+        user_id: userId,
+        role: "user",
+        content: text,
+        model_used: model,
+        created_at: new Date().toISOString(),
+      };
+      setMessages((m) => [...m, userMsg]);
+      void saveMessageToBackend(userMsg);
 
-    // Step 1: Create conversation if none exists
-    let cid = activeConversationId;
-    if (!cid) {
+      // Step 3: Add assistant placeholder
+      const assistantId = uuidv4();
+      const assistantPlaceholder: Message = {
+        id: assistantId,
+        conversation_id: cid!,
+        user_id: userId,
+        role: "assistant",
+        content: "",
+        model_used: model,
+        created_at: new Date().toISOString(),
+      };
+      setMessages((m) => [...m, assistantPlaceholder]);
+      setIsStreaming(true);
+      const history = messagesRef.current
+        .filter(
+          (m) =>
+            m.conversation_id === cid &&
+            (m.role === "user" || m.role === "assistant")
+        )
+        .map((m) => ({ role: m.role as Role, content: m.content }));
+      history.push({ role: "user", content: text });
+
+      // 🧠 Step 4: Classify prompt before deciding route
+      showToast("Classifying your prompt...");
+      let classification;
       try {
-        const r = await fetch(`${BACKEND_URL}/api/chat/create`, {
+        classification = await classifyIdea(text);
+      } catch {
+        classification = { is_startup_idea: false, idea: text };
+      }
+
+      console.log("🧩 Classification result:", classification);
+
+      if (classification.is_startup_idea) {
+        setIsFoundersMode(true);
+        setIdeaDetected(classification.idea);
+        // 🔊 play sound cue
+        const audio = new Audio("/sounds/founders-mode.mp3");
+        audio.volume = 0.8;
+        audio.play().catch(() => {
+          console.warn("Autoplay blocked — user must interact first");
+        });
+      } else {
+        setIsFoundersMode(false);
+        setIdeaDetected(null);
+      }
+
+//      if (classification.is_startup_idea) {
+//   setIsFoundersMode(true);
+//   setIdeaDetected(classification.idea);
+//   showToast("Startup idea detected — orchestrating...");
+
+//   try {
+//     const response = await fetch(`${BACKEND_URL}/api/orchestrator`, {
+//       method: "POST",
+//       headers: { "Content-Type": "application/json" },
+//       body: JSON.stringify({ user_id: userId, idea: classification.idea }),
+//     });
+
+//     if (!response.body) throw new Error("No response stream from backend");
+
+//     const reader = response.body.getReader();
+//     const decoder = new TextDecoder();
+//     let buffer = "";
+
+//     while (true) {
+//       const { done, value } = await reader.read();
+//       if (done) break;
+//       buffer += decoder.decode(value, { stream: true });
+
+//       const lines = buffer.split("\n");
+//       buffer = lines.pop() || "";
+
+//       for (const line of lines) {
+//         if (!line.trim()) continue;
+//         try {
+//           const data = JSON.parse(line);
+//           if (data.message) {
+//             setMessages((prev) =>
+//               prev.map((m) =>
+//                 m.id === assistantId
+//                   ? { ...m, content: (m.content || "") + "\n" + data.message }
+//                   : m
+//               )
+//             );
+//           }
+//         } catch (err) {
+//           console.warn("JSON parse error:", err, line);
+//         }
+//       }
+//     }
+
+//     setIsStreaming(false);
+//     showToast("✅ Orchestration completed!");
+//   } catch (err) {
+//     console.error("Orchestration POST stream failed:", err);
+//     showToast("❌ Failed to orchestrate");
+//     setIsStreaming(false);
+//   }
+//   return;
+// }
+
+if (classification.is_startup_idea) {
+  showToast("🧬 Initializing Galuxium Multi-Agent Orchestration...");
+
+  const url = `${BACKEND_URL}/api/orchestrator?idea=${encodeURIComponent(
+    classification.idea
+  )}&user_id=${userId}`;
+
+  // 🧠 Track all logs streamed to frontend
+  const logs: {
+    timestamp: string;
+    phase: string;
+    sub_phase?: string | null;
+    message: string;
+    progress?: number | null;
+    file_url?: string | null;
+  }[] = [];
+
+  const eventSource = new EventSource(url);
+  setIsStreaming(true);
+let currentIdeaId: string | null = null;
+  eventSource.onmessage = async (event) => {
+    try {
+      const data = JSON.parse(event.data);
+
+      // ⚠️ Handle errors from backend
+      if (data.error) {
+        showToast(`❌ ${data.error}`);
+        console.error("Stream error:", data.error);
+        return;
+      } 
+ if (data.idea_id && !currentIdeaId) {
+      currentIdeaId = data.idea_id;
+      console.log("💾 Captured idea_id from stream:", currentIdeaId);
+    }
+
+      // 🧩 Save every streamed event to logs
+      logs.push({
+        timestamp: new Date().toISOString(),
+        phase: data.phase || "unknown",
+        sub_phase: data.sub_phase || null,
+        message: data.message || "",
+        progress: data.progress || 0,
+        file_url: data.file_url || null,
+      });
+
+      // 🧠 Update UI per phase
+      if (data.phase) {
+        setAgentOutputs((prev) => {
+          const existing = prev.find((a) => a.phase === data.phase);
+          if (existing) {
+            return prev.map((a) =>
+              a.phase === data.phase
+                ? {
+                    ...a,
+                    ...data,
+                    messages: [...(a.messages || []), data.message],
+                  }
+                : a
+            );
+          }
+          return [...prev, { ...data, messages: [data.message] }];
+        });
+      }
+
+      // ✅ When orchestration finishes
+      if (data.done) {
+        showToast("🎯 All Galuxium Agents completed!");
+        setIsStreaming(false);
+
+        // 🗃️ Persist logs to Supabase
+        try {
+          const { data, error } = await supabase
+  .from("orchestration_logs")
+  .insert([
+    {
+      user_id: userId,
+      idea_id: currentIdeaId,
+      logs: JSON.parse(JSON.stringify(logs)),
+      created_at: new Date().toISOString(),
+    },
+  ])
+  .select();
+
+console.log("Supabase insert result:", { data, error });
+const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/report/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ idea_id: currentIdeaId }),
+    });
+
+    const json = await res.json();
+    setReport(json.uploads);
+    console.log("Report generation result:", json);
+
+const finalAssistantMsg: Message = {
+        id: assistantId,
+        conversation_id: cid!,
+        user_id: userId,
+        role: "assistant",
+        content: JSON.parse(JSON.stringify(logs)),
+        model_used: model,
+        created_at: new Date().toISOString(),
+      };
+      void saveMessageToBackend(finalAssistantMsg);
+
+          if (error)
+            console.error("❌ Error saving client logs:", error);
+          else
+            console.log("✅ Client logs saved to Supabase:", logs.length);
+        } catch (e) {
+          console.error("Failed to save client logs:", e);
+        }
+        
+
+        eventSource.close();
+      }
+    } catch (err) {
+      console.warn("Stream parse error:", err);
+    }
+  };
+
+  // ⚙️ Handle connection drop
+  eventSource.onerror = (err) => {
+    console.error("SSE connection failed:", err);
+    //showToast("Stream Closed");
+    setIsStreaming(false);
+    eventSource.close();
+  };
+}
+
+
+
+
+      // 💬 Step 5B: Normal chat fallback (your original /api/chat/search logic)
+      if(!classification.is_startup_idea){
+        try {
+        const resp = await fetch(`${BACKEND_URL}/api/chat/search`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            userId,
-            title: text.slice(0, 50) || "New chat",
             model,
+            userMessages: history,
+            modelProfile: {
+              system_prompt:
+                "You are Galuxium — an advanced assistant that is helpful, concise, and friendly. You were founded by Aaditya Salgaonkar.",
+            },
           }),
         });
-        if (!r.ok) throw new Error("Failed to create conversation");
-        const j = await r.json();
-        cid = j?.data?.id;
-        if (!cid) throw new Error("Conversation creation returned no ID");
-        setConversations((c) => [j.data as Conversation, ...c]);
-        setActiveConversationId(cid);
-      } catch (err) {
-        console.error(err);
-        showToast("Network error while creating conversation");
-        return;
-      }
-    }
 
-    // Step 2: Add user message locally & backend
-    const userMsg: Message = {
-      id: uuidv4(),
-      conversation_id: cid!,
-      user_id: userId,
-      role: "user",
-      content: text,
-      model_used: model,
-      created_at: new Date().toISOString(),
-    };
-    setMessages((m) => [...m, userMsg]);
-    void saveMessageToBackend(userMsg);
-
- 
-
-    // Step 3: Add assistant placeholder
-    const assistantId = uuidv4();
-    const assistantPlaceholder: Message = {
-      id: assistantId,
-      conversation_id: cid!,
-      user_id: userId,
-      role: "assistant",
-      content: "",
-      model_used: model,
-      created_at: new Date().toISOString(),
-    };
-    setMessages((m) => [...m, assistantPlaceholder]);
-    setIsStreaming(true);
- 
-
-    // Step 4: Prepare chat history
-    const history = messagesRef.current
-      .filter((m) => m.conversation_id === cid && (m.role === "user" || m.role === "assistant"))
-      .map((m) => ({ role: m.role as Role, content: m.content }));
-    history.push({ role: "user", content: text });
-
-    
-
-    try {
-      // Step 5: Call AI backend
-      const resp = await fetch(`${BACKEND_URL}/api/chat/search`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId,
-          model,
-          userMessages: history,
-          modelProfile: {
-            system_prompt:
-              "You are Galuxium — an advanced assistant that is helpful, concise, and friendly. You were founded by Aaditya Salgaonkar.",
-          },
-        }),
-      });
-      if (!resp.ok) throw new Error(`OpenRouter call failed: ${resp.status}`);
+        if (!resp.ok) throw new Error(`OpenRouter call failed: ${resp.status}`);
       const json = await resp.json();
 
       const reply =
@@ -349,27 +579,24 @@ const sendMessage = useCallback(
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, tokens: totalTokensUsed, userTokens,assistantTokens }),
       });
-
-    } catch (err) {
-      console.error("sendMessage error", err);
-      showToast("AI response failed");
-      setMessages((prev) =>
-        prev.map((m) =>
-          m.id === assistantId
-            ? { ...m, content: (m.content || "") + "\n\n[Request failed]" }
-            : m
-        )
-      );
-    } finally {
-      setIsStreaming(false);
-    }
-  },
-  [activeConversationId, model, saveMessageToBackend, showToast, userId, userPlan, userTokensUsed]
-);
-
-
-
-
+      } catch (err) {
+        console.error("sendMessage error", err);
+        showToast("AI response failed");
+      } finally {
+        setIsStreaming(false);
+      }
+      }
+    },
+    [
+      activeConversationId,
+      model,
+      saveMessageToBackend,
+      showToast,
+      userId,
+      userPlan,
+      userTokensUsed,
+    ]
+  );
 
   const sortedConversations = [...conversations].sort((a, b) => {
     const dateA = a.updated_at
@@ -438,7 +665,7 @@ const sendMessage = useCallback(
               <Bot />
               {models.find((m) => m.id === model)?.name || model}
             </div>
-            
+
             {open && (
               <div className="absolute right-32 text-xs md:text-1.5xl md:w-[15vw] mt-2 rounded-xl shadow-lg overflow-hidden bg-gradient-to-r from-[#2000c1] to-[#2e147e] text-white z-10 ">
                 {models.map((m) => (
@@ -452,7 +679,8 @@ const sendMessage = useCallback(
                       model === m.id ? "bg-white/20" : ""
                     }`}
                   >
-                    <p className="font-medium">{m.name}</p> {/* ✅ frontend display */}
+                    <p className="font-medium">{m.name}</p>{" "}
+                    {/* ✅ frontend display */}
                     <p className="text-[9px] font-normal">{m.description}</p>
                   </div>
                 ))}
@@ -485,32 +713,39 @@ const sendMessage = useCallback(
             New
             <FaFacebookMessenger />
           </h1>
-          
+
           <h1
             className="text-xs md:hidden cursor-pointer items-center -ml-3  flex-row gap-2 font-semibold text-white h-fit py-2 px-3 rounded-2xl bg-gradient-to-r from-[#2000c1] to-[#2e147e]"
             onClick={() => setConversationsList(true)}
           >
-            <FaHistory/>
+            <FaHistory />
           </h1>
-          
 
-          <div className="px-3 hidden md:flex mb-5 rounded-lg bg-gradient-to-br from-white to-gray-50 shadow-sm border border-gray-200 flex-row gap-5 items-center text-center h-fit py-2">
-            <div className="font-semibold text-xs text-black flex flex-col text-left">
-              Tokens
-              <span className="text-xl">{formatTokens(userTokens)}</span>
-              Prompt Load
+          {isFoundersMode && ideaDetected && (
+            <div className="py-3 -mr-3">
+              <FoundersModeBanner idea={ideaDetected} />
             </div>
-            <div className="font-semibold text-xs text-black flex flex-col text-left">
-              Tokens
-              <span className="text-xl">{formatTokens(assistantTokens)}</span>
-              AI Response
+          )}
+
+          {!isFoundersMode && !ideaDetected && (
+            <div className="px-3 hidden md:flex mb-5 rounded-lg bg-gradient-to-br from-white to-gray-50 shadow-sm border border-gray-200 flex-row gap-5 items-center text-center h-fit py-2">
+              <div className="font-semibold text-xs text-black flex flex-col text-left">
+                Tokens
+                <span className="text-xl">{formatTokens(userTokens)}</span>
+                Prompt Load
+              </div>
+              <div className="font-semibold text-xs text-black flex flex-col text-left">
+                Tokens
+                <span className="text-xl">{formatTokens(assistantTokens)}</span>
+                AI Response
+              </div>
+              <div className="text-xs font-semibold text-gray-900 flex flex-col text-left">
+                Tokens
+                <span className="text-xl">{formatTokens(userTokensUsed)}</span>
+                Total Usage
+              </div>
             </div>
-            <div className="text-xs font-semibold text-gray-900 flex flex-col text-left">
-              Tokens
-              <span className="text-xl">{formatTokens(userTokensUsed)}</span>
-              Total Usage
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
@@ -521,25 +756,125 @@ const sendMessage = useCallback(
             className="-mt-7 md:-mt-10 px-10 h-[75vh] md:h-[85vh] overflow-y-auto mb-1 scrollbar-hide custom-scrollbar flex flex-col"
           >
             <div className="pb-14">
-              {messages
-              .filter((m) => m.conversation_id === activeConversationId)
-              .map((m) => (
-                <MessageBubble key={m.id} msg={m} model={models.find((mdl) => mdl.id === m.model_used)?.name || m.model_used || ""} />
+              <div
+                className={`transition-all duration-700 ${
+                  isFoundersMode ? "animate-pulse-slow" : ""
+                }`}
+              >
+                {messages
+                  .filter((m) => m.conversation_id === activeConversationId)
+                  .map((m) => (
+                    <MessageBubble
+                      key={m.id}
+                      msg={m}
+                      model={
+                        models.find((mdl) => mdl.id === m.model_used)?.name ||
+                        m.model_used ||
+                        ""
+                      }
+                    />
+                    
+                  ))}
+              </div>
+               {agentOutputs.map((a) => (
+            <AgentCard key={a.phase} agent={a} />
+          ))}
+           
+      {
+        report && (
+           <div className="relative mt-5 mb-10 overflow-hidden rounded-2xl border border-white/20 bg-gradient-to-br from-white/20 to-white/25 backdrop-blur-xl shadow-xl p-6 transition-all  ">
+      {/* Decorative glow */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-400/10 via-purple-500/10 to-transparent pointer-events-none" />
+
+      <div className="relative z-10 space-y-5">
+        <div className="flex items-center justify-between">
+          <h3 className="text-2xl font-bold text-[#2e147e]">
+            Your Generated Report
+          </h3>
+          <span className="text-xs font-medium text-white/60 uppercase tracking-wider">
+            {new Date().toLocaleDateString()}
+          </span>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4 mt-3">
+          {report?.pdf && (
+            <Link
+              href={report.pdf}
+              target="_blank"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-medium shadow-md hover:shadow-lg hover:scale-[1.02] transition-all"
+            >
+              <FileText size={18} /> View PDF
+            </Link>
+          )}
+
+          {report?.pptx && (
+            <Link
+              href={report.pptx}
+              target="_blank"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-purple-600 to-pink-600 text-white font-medium shadow-md hover:shadow-lg hover:scale-[1.02] transition-all"
+            >
+              <Presentation size={18} /> Download Deck
+            </Link>
+          )}
+        </div>
+
+        {/* Palette preview */}
+        {report?.palette && (
+          <div className="mt-6">
+            <h4 className="text-sm font-medium text-[#2e147e] flex items-center gap-2">
+              <Palette size={16} /> Brand Palette
+            </h4>
+            <div className="mt-3 relative w-full max-w-sm">
+              <Image
+                src={report.palette}
+                alt="Palette"
+                width={400}
+                height={200}
+                className="rounded-xl shadow-lg ring-1 ring-white/20"
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Logos */}
+        {report?.logos?.length > 0 && (
+          <div className="mt-6">
+            <h4 className="text-sm font-medium text-[#2e147e]">Generated Logos</h4>
+            <div className="mt-3 flex flex-wrap gap-3">
+              {report.logos.map((url, i) => (
+                <div
+                  key={i}
+                  className="p-2 rounded-xl bg-white/10 backdrop-blur-md border border-white/20 hover:border-white/40 hover:scale-105 transition-transform"
+                >
+                  <Image
+                    src={url}
+                    alt={`Logo ${i + 1}`}
+                    width={100}
+                    height={100}
+                    className="rounded-lg"
+                  />
+                </div>
               ))}
             </div>
-            
-<div className="absolute bottom-1 w-[65vw]">
-  <SearchBar
-              disabled={isStreaming || !session?.user?.id}
-              onSend={(t) => void sendMessage(t)}
-              scrollToBottom={scrollToBottom}
-              autoScroll={autoScroll}
-              
-            />
-</div>
+          </div>
+        )}
+      </div>
+    </div>
+        )
+      }
+      
+            </div>
+
+            <div className="absolute bottom-1 w-[65vw]">
+              <SearchBar
+                disabled={isStreaming || !session?.user?.id}
+                onSend={(t) => void sendMessage(t)}
+                scrollToBottom={scrollToBottom}
+                autoScroll={autoScroll}
+              />
+            </div>
             <div ref={bottomRef} />
           </div>
-          
         </div>
 
         <div
@@ -556,83 +891,86 @@ const sendMessage = useCallback(
             />
           ))}
         </div>
-         
-              <AnimatePresence>
-                  {conversationsList && (
-                  <>
-                    {/* Overlay */}
-                    <motion.div
-                      className="fixed inset-0  backdrop-blur-xs"
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      exit={{ opacity: 0 }}
-                      onClick={() => setConversationsList(false)}
+
+        <AnimatePresence>
+          {conversationsList && (
+            <>
+              {/* Overlay */}
+              <motion.div
+                className="fixed inset-0  backdrop-blur-xs"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                onClick={() => setConversationsList(false)}
+              />
+
+              {/* Drawer */}
+              <motion.aside
+                className="fixed top-0 right-0 h-full bg-violet-200 shadow-lg flex flex-col justify-between"
+                initial={{ x: "+100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "+100%" }}
+                transition={{ duration: 0.3 }}
+              >
+                <div className="px-3 flex m-3 rounded-lg bg-gradient-to-br from-white to-gray-50 shadow-sm border border-gray-200 flex-row gap-4 items-center text-center h-fit py-2">
+                  <div className="font-medium text-xs text-black flex flex-col text-left">
+                    Tokens
+                    <span className="text-lg">{formatTokens(userTokens)}</span>
+                    Prompt <br /> Load
+                  </div>
+                  <div className="font-medium text-xs text-black flex flex-col text-left">
+                    Tokens
+                    <span className="text-lg">
+                      {formatTokens(assistantTokens)}
+                    </span>
+                    AI <br />
+                    Response
+                  </div>
+                  <div className="text-xs font-medium text-gray-900 flex flex-col text-left">
+                    Tokens
+                    <span className="text-lg">
+                      {formatTokens(userTokensUsed)}
+                    </span>
+                    Total <br />
+                    Usage
+                  </div>
+                </div>
+
+                <div>
+                  <div
+                    onClick={() => setOpen(!open)}
+                    className="text-xs md:hidden cursor-pointer mx-4 mb-2 items-center flex flex-row gap-2 font-semibold text-white h-fit py-2 px-3 rounded-lg bg-gradient-to-r from-[#2000c1] to-[#2e147e] select-none"
+                  >
+                    <Bot size={20} />
+                    {models.find((m) => m.id === model)?.name || model}
+                  </div>
+                  <h1
+                    className="text-xs md:hidden flex cursor-pointer items-center mx-4 mb-3  flex-row gap-2 font-semibold text-white h-fit py-2 px-3 rounded-lg bg-gradient-to-r from-[#2000c1] to-[#2e147e]"
+                    onClick={() => createConversation("New Chat")}
+                  >
+                    <FaPlus />
+                    New Chat
+                  </h1>
+                </div>
+                <div
+                  ref={containerRef}
+                  onClick={() => setConversationsList(false)}
+                  className="flex-col md:hidden gap-2 flex px-4 h-[80vh] w-[40vw] overflow-y-auto scrollbar-hide custom-scrollbar"
+                >
+                  {sortedConversations.map((c) => (
+                    <ConversationBubble
+                      key={`mobile-${c.id}`}
+                      c={c}
+                      activeConversationId={activeConversationId}
+                      setActiveConversationId={setActiveConversationId}
+                      onDelete={handleDelete}
                     />
-                    
-                    {/* Drawer */}
-                    <motion.aside
-                      className="fixed top-0 right-0 h-full bg-violet-200 shadow-lg flex flex-col justify-between"
-                      initial={{ x: "+100%" }}
-                      animate={{ x: 0 }}
-                      exit={{ x: "+100%" }}
-                      transition={{ duration: 0.3 }}
-                    >
-                     <div className="px-3 flex m-3 rounded-lg bg-gradient-to-br from-white to-gray-50 shadow-sm border border-gray-200 flex-row gap-4 items-center text-center h-fit py-2">
-            <div className="font-medium text-xs text-black flex flex-col text-left">
-              Tokens
-              <span className="text-lg">{formatTokens(userTokens)}</span>
-              Prompt <br/> Load
-            </div>
-            <div className="font-medium text-xs text-black flex flex-col text-left">
-              Tokens
-              <span className="text-lg">{formatTokens(assistantTokens)}</span>
-              AI <br/>Response
-            </div>
-            <div className="text-xs font-medium text-gray-900 flex flex-col text-left">
-              Tokens
-              <span className="text-lg">{formatTokens(userTokensUsed)}</span>
-              Total <br/>Usage
-            </div>
-          </div>
-          <div>
-            <div
-              onClick={() => setOpen(!open)}
-              className="text-xs md:hidden cursor-pointer mx-4 mb-2 items-center flex flex-row gap-2 font-semibold text-white h-fit py-2 px-3 rounded-lg bg-gradient-to-r from-[#2000c1] to-[#2e147e] select-none"
-            >
-              <Bot size={20} />
-              {models.find((m) => m.id === model)?.name || model}
-            </div>
-<h1
-            className="text-xs md:hidden flex cursor-pointer items-center mx-4 mb-3  flex-row gap-2 font-semibold text-white h-fit py-2 px-3 rounded-lg bg-gradient-to-r from-[#2000c1] to-[#2e147e]"
-            onClick={() => createConversation("New Chat")}
-          >
-            <FaPlus/>New Chat
-          </h1>
-          </div>
-          <div
-          ref={containerRef}
-          onClick={() => setConversationsList(false)}
-          className="flex-col md:hidden gap-2 flex px-4 h-[80vh] w-[40vw] overflow-y-auto scrollbar-hide custom-scrollbar"
-        >
-          {sortedConversations.map((c) => (
-            <ConversationBubble
-              key={`mobile-${c.id}`}
-              c={c}
-              activeConversationId={activeConversationId}
-              setActiveConversationId={setActiveConversationId}
-              onDelete={handleDelete}
-              
-            />
-          ))}
-        </div>
-        
-                    </motion.aside>
-                  </>
-                )}
-              </AnimatePresence>
-
-
-        
+                  ))}
+                </div>
+              </motion.aside>
+            </>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Toast */}
