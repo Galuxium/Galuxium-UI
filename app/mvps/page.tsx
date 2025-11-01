@@ -72,7 +72,8 @@ export default function ManageMVPsPage() {
   const { session } = useSession();
 
   // PREVIEW STATES
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+const [previewUrl, setPreviewUrl] = useState<Record<string, string | null>>({});
+
   const [previewMvp, setPreviewMvp] = useState<MVP | null>(null);
   const [isStartingPreview, setIsStartingPreview] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
@@ -300,28 +301,48 @@ export default function ManageMVPsPage() {
   };
 
   // ---------- Preview helpers ----------
-  const openPreview = async (mvp: MVP) => {
+const openPreview = async (mvp: MVP) => {
+  try {
     setPreviewMvp(mvp);
-    // Prefer vercel_url if project already deployed
-    const url = await fetch(`${API_BASE}/api/mvp/preview`, {
-  method: "POST",
-  headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ files: mvp.files }),
-});
-;
     setIsStartingPreview(true);
-    setPreviewUrl(url);
-    setShowPreviewModal(true);
     setDeploymentStatus("idle");
     setPublishedUrl(mvp.vercel_url || null);
 
-    // If the iframe can't load quickly, the overlay will indicate; onLoad handler will clear isStartingPreview
-    // we keep isStartingPreview true until iframe reports load (onLoad)
-  };
+    // If project already has a deployed URL, use that
+    if (mvp.vercel_url) {
+      setPreviewUrl({ [mvp.id]: mvp.vercel_url });
+      setShowPreviewModal(true);
+      return;
+    }
+
+    // Otherwise request a preview URL
+    const res = await fetch(`${API_BASE}/api/mvp/preview`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ files: mvp.files }),
+    });
+
+    if (!res.ok) throw new Error("Failed to start preview");
+
+    // 👇 Extract the preview URL from response JSON
+    const data = await res.json();
+    const previewLink = data?.previewUrl || data?.url; // depends on backend field
+
+    // 👇 Now set the preview URL (string)
+    setPreviewUrl(prev => ({ ...prev, [mvp.id]: previewLink }));
+
+    setShowPreviewModal(true);
+  } catch (err) {
+    console.error("Error starting preview:", err);
+    setDeploymentStatus("error");
+  } finally {
+    setIsStartingPreview(false);
+  }
+};
 
   const stopPreview = () => {
     setShowPreviewModal(false);
-    setPreviewUrl(null);
+    setPreviewUrl({});
     setPreviewMvp(null);
     setIsStartingPreview(false);
   };
@@ -617,7 +638,7 @@ export default function ManageMVPsPage() {
                       <iframe
                         ref={iframeRef}
                         className="w-full h-full border-none bg-white dark:bg-gray-900"
-                        src={previewUrl}
+                         src={previewUrl[previewMvp?.id ?? ""] ?? ""}
                         onLoad={() => {
                           setIsStartingPreview(false);
                           // hide iframe overlay if any
