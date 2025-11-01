@@ -57,7 +57,7 @@ export interface ModelOption {
   description: string;
 }
 
-const BACKEND_URL: string = process.env.NEXT_PUBLIC_BACKEND_URL as string;
+
 
 function estimateTokensFromText(text: string): number {
   if (!text) return 0;
@@ -124,7 +124,7 @@ const [report, setReport] = useState<ReportData | null>(null);
 
   useEffect(() => {
     const fetchModels = async () => {
-      const res = await fetch(`${BACKEND_URL}/api/chat/models`);
+      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/chat/models`);
       const { data } = await res.json();
 
       setModels(data);
@@ -139,7 +139,7 @@ const [report, setReport] = useState<ReportData | null>(null);
     (async () => {
       try {
         const r = await fetch(
-          `${BACKEND_URL}/api/chat/list?userId=${encodeURIComponent(userId)}`
+          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/chat/list?userId=${encodeURIComponent(userId)}`
         );
         if (!r.ok) return;
         const j = await r.json();
@@ -164,7 +164,7 @@ const [report, setReport] = useState<ReportData | null>(null);
     (async () => {
       try {
         const r = await fetch(
-          `${BACKEND_URL}/api/chat/${encodeURIComponent(cid)}`
+          `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/chat/${encodeURIComponent(cid)}`
         );
         if (!r.ok) {
           console.warn("fetch messages failed status", r.status);
@@ -194,7 +194,7 @@ const [report, setReport] = useState<ReportData | null>(null);
           return;
         }
         const payload = { userId, title, model };
-        const r = await fetch(`${BACKEND_URL}/api/chat/create`, {
+        const r = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/chat/create`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -221,7 +221,7 @@ const [report, setReport] = useState<ReportData | null>(null);
   // save single message to backend
   const saveMessageToBackend = useCallback(async (m: Message) => {
     try {
-      await fetch(`${BACKEND_URL}/api/chat/save`, {
+      await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/chat/save`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -256,7 +256,7 @@ const [report, setReport] = useState<ReportData | null>(null);
       let cid = activeConversationId;
       if (!cid) {
         try {
-          const r = await fetch(`${BACKEND_URL}/api/chat/create`, {
+          const r = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/chat/create`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -396,7 +396,7 @@ const [report, setReport] = useState<ReportData | null>(null);
 if (classification.is_startup_idea) {
   showToast("🧬 Initializing Galuxium Multi-Agent Orchestration...");
 
-  const url = `${BACKEND_URL}/api/orchestrator?idea=${encodeURIComponent(
+  const url = `${process.env.NEXT_PUBLIC_BACKEND_URL}/api/orchestrator?idea=${encodeURIComponent(
     classification.idea
   )}&user_id=${userId}`;
 
@@ -529,7 +529,7 @@ const finalAssistantMsg: Message = {
       // 💬 Step 5B: Normal chat fallback (your original /api/chat/search logic)
       if(!classification.is_startup_idea){
         try {
-        const resp = await fetch(`${BACKEND_URL}/api/chat/search`, {
+        const resp = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/chat/search`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
@@ -574,7 +574,7 @@ const finalAssistantMsg: Message = {
       const totalTokensUsed = userTokens + assistantTokens;
       setUserTokensUsed((prev) => prev + totalTokensUsed);
 
-      void fetch(`${BACKEND_URL}/api/chat/updateTokens`, {
+      void fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/chat/updateTokens`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, tokens: totalTokensUsed, userTokens,assistantTokens }),
@@ -633,7 +633,7 @@ const finalAssistantMsg: Message = {
   };
   const handleDelete = async (id: string) => {
     try {
-      const resp = await fetch(`${BACKEND_URL}/api/chat/delete`, {
+      const resp = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/chat/delete`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ conversationId: id }),
